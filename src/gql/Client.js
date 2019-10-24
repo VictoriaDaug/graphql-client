@@ -5,7 +5,7 @@ import {
     CombinedError
 } from '../utils/errorHandlers';
 
-const executeFetch = async operation => {
+const executeFetch = operation => {
     const {
         query,
         variables,
@@ -60,9 +60,36 @@ export class Client {
             fetchOptions: context.fetchOptions || {},
             requestPolicy: context.requestPolicy || 'cache-first'
         };
+        this.listeners = {}
     }
 
-    execute = async (baseOperation, cb) => {
+    onOperationStart(operation, cb) {
+        const {
+            key
+        } = operation;
+        const listeners = this.listeners[key] || (this.listeners[key] = new Set())
+        listeners.add(cb)
+
+        executeFetch(operation).then(this.onResult)
+    }
+
+    onOperationEnd(operation, cb) {
+        const {
+            key
+        } = operation;
+        const listeners = this.listeners[key] || (this.listeners[key] = new Set())
+        listeners.delete(cb)
+    }
+
+    onResult = result => {
+        const {
+            key
+        } = result.operation;
+        const listeners = this.listeners[key] || (this.listeners[key] = new Set())
+        listeners.forEach(listener => listener(result))
+    }
+
+    execute = (baseOperation, cb) => {
         const operation = {
             ...baseOperation,
             context: {
@@ -71,7 +98,7 @@ export class Client {
             }
         };
 
-        const result = await executeFetch(operation);
-        cb(result);
+        this.onOperationStart(operation, cb);
+        return () => this.onOperationEnd(operation, cb);
     };
 }
