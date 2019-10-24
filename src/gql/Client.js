@@ -5,51 +5,73 @@ import {
     CombinedError
 } from '../utils/errorHandlers';
 
-const executeFetch = async (url, options) =>
-    fetch(url, options)
-    .then(res => {
-        if (res.status < 200 || res.status >= 300) {
-            throw new Error(res.statusText);
-        } else {
-            return res.json();
-        }
-    });
+const executeFetch = async operation => {
+    const {
+        query,
+        variables,
+        context
+    } = operation;
 
-export class Client {
-    constructor(url) {
-        this.url = url;
+    const options = {
+        method: 'POST',
+        body: JSON.stringify({
+            query: print(query),
+            variables
+        }),
+        headers: {
+            'content-type': 'application/json',
+            ...context.fetchOptions.headers
+        },
+        ...context.fetchOptions
     }
-    execute = async (operation, cb) => {
-        const fetchOptions = {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json',
-            },
-            body: JSON.stringify({
-                query: print(operation.query),
-                variables: operation.variables
-            })
-        };
-        try {
-            const {
-                data,
-                errors
-            } = await executeFetch(this.url, fetchOptions)
-            cb({
-                operation,
-                data,
-                error: errors ? new CombinedError({
+    return context.fetch(context.url, options)
+        .then(res => {
+            if (res.status < 200 || res.status >= 300) {
+                throw new Error(res.statusText);
+            } else {
+                return res.json();
+            }
+        })
+        .then(({
+            data,
+            errors
+        }) => ({
+            operation,
+            data,
+            error: errors ?
+                new CombinedError({
                     graphQLErrors: errors
                 }) : undefined
+        }))
+        .catch(networkError => ({
+            operation,
+            data: undefined,
+            error: new CombinedError({
+                networkError
             })
-        } catch (networkError) {
-            cb({
-                operation,
-                data: undefined,
-                error: new CombinedError({
-                    networkError
-                })
-            })
-        }
+        }));
+};
+
+export class Client {
+    constructor(url, context = {}) {
+        this.context = {
+            url,
+            fetch: context.fetch || window.fetch.bind(window),
+            fetchOptions: context.fetchOptions || {},
+            requestPolicy: context.requestPolicy || 'cache-first'
+        };
+    }
+
+    execute = async (baseOperation, cb) => {
+        const operation = {
+            ...baseOperation,
+            context: {
+                ...this.context,
+                ...baseOperation.context
+            }
+        };
+
+        const result = await executeFetch(operation);
+        cb(result);
     };
 }
