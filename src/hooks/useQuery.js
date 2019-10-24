@@ -1,67 +1,26 @@
-import {
-    useState,
-    useEffect
-} from 'react'
-import {
-    print
-} from 'graphql'
-import {
-    useRequest
-} from './useRequest'
 
-export const useQuery = ({
-    query,
-    variables
-}) => {
-    const request = useRequest('query', query, variables);
-    const [result, setResult] = useState({
-        data: undefined,
-        errors: undefined,
-        fetching: true
-    })
+import { useState, useEffect } from 'react';
+import { useRequest } from './useRequest';
+import { useClient } from '../contexts/contextCreator';
 
-    useEffect(() => {
-        setResult(res => ({
-            ...res,
-            fetching: true
-        }))
-        const options = {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json',
-            },
-            body: JSON.stringify({
-                query: print(request.query),
-                variables: request.variables
-            })
-        }
+export const useQuery = ({ query, variables }) => {
+  const client = useClient();
+  const request = useRequest('query', query, variables);
 
-        fetch('https://threed-test-api.herokuapp.com/graphql', options)
-            .then(res => {
-                if (res.status < 200 || res.status >= 300) {
-                    throw new Error(res.statusText);
-                } else {
-                    return res.json()
-                }
-            })
-            .then(({
-                data,
-                errors
-            }) => {
-                setResult({
-                    data,
-                    errors,
-                    fetching: false
-                })
-            })
-            .catch(error => {
-                setResult({
-                    data: undefined,
-                    errors: [error],
-                    fetching: false
-                })
-            })
-    }, [request])
+  const [result, setResult] = useState({
+    fetching: true
+  });
 
-    return result
-}
+  useEffect(() => {
+    setResult(res => ({ ...res, fetching: true }));
+
+    client.execute(request, result => {
+      setResult({
+        ...result,
+        fetching: false
+      });
+    });
+  }, [request, client]);
+
+  return result;
+};
