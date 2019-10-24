@@ -7,6 +7,9 @@ import {
 import {
     composeExchanges
 } from './composeExchanges';
+import {
+    TEARDOWN
+} from '../utils/constants';
 
 export class Client {
     constructor(url, opts = {}) {
@@ -40,6 +43,12 @@ export class Client {
         } = operation;
         const listeners = this.getListeners(key)
         listeners.delete(cb)
+        if (listeners.size === 0) {
+            this.sendOperation({
+                ...operation,
+                operationName: TEARDOWN
+            });
+        }
     }
 
     onResult = result => {

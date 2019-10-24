@@ -4,9 +4,26 @@ import {
 import {
     CombinedError
 } from '../utils/errorHandlers';
+import {
+    TEARDOWN
+} from '../utils/constants';
 
-export const fetchExchange = () => sendResult => {
+export const fetchExchange = ({
+    client,
+    forward
+}) => sendResult => {
+    const next = forward(sendResult)
+    const controllers = new Map();
+
     return operation => {
+        if (operation.operationName === TEARDOWN) {
+            const controller = controllers.get(operation.key);
+            if (controller !== undefined) controller.abort();
+            return next(operation);
+        } else if (operation.operationName === 'subscription') {
+            return next(operation)
+        }
+
         const {
             query,
             variables,
@@ -17,7 +34,12 @@ export const fetchExchange = () => sendResult => {
             url
         } = context;
 
+        // New to most browsers. Might require a polyfill 
+        const controller = new AbortController();
+        controllers.set(operation.key, controller)
+
         const options = {
+            signal: controller.signal,
             method: "POST",
             body: JSON.stringify({
                 query: print(query),
@@ -41,20 +63,26 @@ export const fetchExchange = () => sendResult => {
             .then(({
                 data,
                 errors
-            }) => ({
-                operation,
-                data,
-                error: errors ? new CombinedError({
-                    graphQLErrors: errors
-                }) : undefined
-            }))
-            .catch(networkError => ({
-                operation,
-                data: undefined,
-                error: new CombinedError({
-                    networkError
-                })
-            }))
-            .then(sendResult);
+            }) => {
+                controllers.delete(operation.key);
+                sendResult({
+                    operation,
+                    data,
+                    error: errors ? new CombinedError({
+                        graphQLErrors: errors
+                    }) : undefined
+                });
+            })
+            .catch(networkError => {
+                controllers.delete(operation.key);
+                if (networkError.name === 'AbortError') return;
+                sendResult({
+                    operation,
+                    data: undefined,
+                    error: new CombinedError({
+                        networkError
+                    })
+                });
+            });
     };
 };

@@ -1,6 +1,9 @@
 import {
     CombinedError
 } from '../utils/errorHandlers';
+import {
+    TEARDOWN
+} from '../utils/constants';
 
 export const composeExchanges = (client, exchanges) => {
     return exchanges.reduceRight((inner, exchange) => {
@@ -12,7 +15,7 @@ export const composeExchanges = (client, exchanges) => {
 };
 
 const fallback = sendResult => operation => {
-    if (operation.operationName !== 'teardown') {
+    if (operation.operationName !== TEARDOWN) {
         sendResult({
             operation,
             data: undefined,

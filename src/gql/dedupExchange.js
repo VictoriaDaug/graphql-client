@@ -1,3 +1,7 @@
+import {
+    TEARDOWN
+} from '../utils/constants';
+
 export const dedupExchange = ({
     forward
 }) => sendResult => {
@@ -7,7 +11,7 @@ export const dedupExchange = ({
         sendResult(result)
     });
     return operation => {
-        if (operation.operationName === 'teardown') {
+        if (operation.operationName === TEARDOWN) {
             activeOperations.delete(operation.key);
             next(operation);
         } else if (!activeOperations.has(operation.key)) {
