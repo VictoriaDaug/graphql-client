@@ -8,6 +8,10 @@ import {
     composeExchanges
 } from './composeExchanges';
 import {
+    cacheExchange
+}
+from './cacheExchange';
+import {
     TEARDOWN
 } from '../utils/constants';
 
@@ -19,7 +23,7 @@ export class Client {
             fetchOptions: opts.fetchOptions || {},
             requestPolicy: opts.requestPolicy || 'cache-first'
         };
-        const exchanges = opts.exchanges || [dedupExchange, fetchExchange];
+        const exchanges = opts.exchanges || [dedupExchange, cacheExchange, fetchExchange];
         this.sendOperation = composeExchanges(this, exchanges)(this.onResult.bind(this));
         this.listeners = {};
     }
@@ -58,6 +62,16 @@ export class Client {
         const listeners = this.getListeners(key)
         listeners.forEach(listener => listener(result))
     }
+
+    reexecute = operation => {
+        const {
+            key
+        } = operation;
+        const listeners = this.listeners[key] || (this.listeners[key] = new Set());
+        if (listeners.size > 0) {
+            this.sendOperation(operation);
+        }
+    };
 
     execute = (baseOperation, cb) => {
         const operation = {

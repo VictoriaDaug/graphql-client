@@ -8,13 +8,16 @@ import {
 import {
     useClient
 } from '../contexts/contextCreator';
+import {
+    QUERY
+} from '../utils/constants'
 
 export const useQuery = ({
     query,
     variables
 }) => {
     const client = useClient();
-    const request = useRequest('query', query, variables);
+    const request = useRequest(QUERY, query, variables);
 
     const [result, setResult] = useState({
         fetching: true

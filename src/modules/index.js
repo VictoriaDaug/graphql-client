@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useState} from "react";
 import gql from "graphql-tag";
 import Thread from "./Thread";
 import { useScrollToTop } from "../common/useScrollToTop";
@@ -26,7 +26,9 @@ const THREADS_QUERY = gql`
   }
 `;
 
-const Home = () => {
+// TODO: remove me. I am a dummy test to check if teardown and cache are working.
+const QueryComponent = () => {
+
   useScrollToTop();
 
     const {data, errors, fetching} = useQuery({
@@ -40,11 +42,27 @@ const Home = () => {
   if (errors) return <p>Error! {errors[0].message}</p>
 
   return (
-    <div>
+    <>
+
       {data && data.threads.map(thread => (
         <Thread key={thread.id} {...thread} />
       ))}
-    </div>
+
+    </>
+  );
+}
+
+const Home = () => {
+  const [hide, setHide] = useState(false)
+  useScrollToTop();
+
+  return (
+    <>
+    <button onClick={() => setHide(!hide)}>Click me!</button>
+   { hide ? <div>Tear down should be happening</div> : <div>
+      <QueryComponent />
+    </div>}
+    </>
   );
 };
 
