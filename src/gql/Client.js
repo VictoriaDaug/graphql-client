@@ -1,83 +1,44 @@
 import {
-    print
-} from 'graphql';
+    fetchExchange
+} from './fetchExchange';
 import {
-    CombinedError
-} from '../utils/errorHandlers';
-
-const executeFetch = operation => {
-    const {
-        query,
-        variables,
-        context
-    } = operation;
-
-    const options = {
-        method: 'POST',
-        body: JSON.stringify({
-            query: print(query),
-            variables
-        }),
-        headers: {
-            'content-type': 'application/json',
-            ...context.fetchOptions.headers
-        },
-        ...context.fetchOptions
-    }
-    return context.fetch(context.url, options)
-        .then(res => {
-            if (res.status < 200 || res.status >= 300) {
-                throw new Error(res.statusText);
-            } else {
-                return res.json();
-            }
-        })
-        .then(({
-            data,
-            errors
-        }) => ({
-            operation,
-            data,
-            error: errors ?
-                new CombinedError({
-                    graphQLErrors: errors
-                }) : undefined
-        }))
-        .catch(networkError => ({
-            operation,
-            data: undefined,
-            error: new CombinedError({
-                networkError
-            })
-        }));
-};
+    dedupExchange
+} from './dedupExchange';
+import {
+    composeExchanges
+} from './composeExchanges';
 
 export class Client {
-    constructor(url, context = {}) {
+    constructor(url, opts = {}) {
         this.context = {
             url,
-            fetch: context.fetch || window.fetch.bind(window),
-            fetchOptions: context.fetchOptions || {},
-            requestPolicy: context.requestPolicy || 'cache-first'
+            fetch: opts.fetch || window.fetch.bind(window),
+            fetchOptions: opts.fetchOptions || {},
+            requestPolicy: opts.requestPolicy || 'cache-first'
         };
-        this.listeners = {}
+        const exchanges = opts.exchanges || [dedupExchange, fetchExchange];
+        this.sendOperation = composeExchanges(this, exchanges)(this.onResult.bind(this));
+        this.listeners = {};
     }
 
+    getListeners(key) {
+        return this.listeners[key] || (this.listeners[key] = new Set())
+    }
     onOperationStart(operation, cb) {
         const {
             key
         } = operation;
-        const listeners = this.listeners[key] || (this.listeners[key] = new Set())
+        const listeners = this.getListeners(key)
         listeners.add(cb)
 
-        executeFetch(operation).then(this.onResult)
+        this.sendOperation(operation);
     }
 
     onOperationEnd(operation, cb) {
         const {
             key
         } = operation;
-        const listeners = this.listeners[key] || (this.listeners[key] = new Set())
+        const listeners = this.getListeners(key)
         listeners.delete(cb)
     }
 
@@ -85,7 +46,7 @@ export class Client {
         const {
             key
         } = result.operation;
-        const listeners = this.listeners[key] || (this.listeners[key] = new Set())
+        const listeners = this.getListeners(key)
         listeners.forEach(listener => listener(result))
     }
 
