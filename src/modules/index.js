@@ -18,18 +18,21 @@ const THREADS_QUERY = gql`
       hasUserLiked
       likesNumber
       repliesNumber
+      replies(skip: $skip, limit: $limit) {
+        text
+        createdAt
+      }
     }
   }
 `;
 
 const Home = () => {
   useScrollToTop();
-  //TODO: Replace these with useQuery hook you wrote
 
     const {data, errors, fetching} = useQuery({
       query: THREADS_QUERY,
       variables: {
-        sortBy: 'LATEST', limit: 2
+        sortBy: 'OLDEST', limit: 10
       }
     })
 

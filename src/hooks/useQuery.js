@@ -13,7 +13,7 @@ export const useQuery = ({
     query,
     variables
 }) => {
-    const request = useRequest(query, variables);
+    const request = useRequest('query', query, variables);
     const [result, setResult] = useState({
         data: undefined,
         errors: undefined,
